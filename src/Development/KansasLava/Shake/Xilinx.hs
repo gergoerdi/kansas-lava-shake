@@ -9,6 +9,7 @@ import           Development.Shake          hiding ((~>))
 import           Development.Shake.FilePath
 
 import qualified Data.Text                  as T
+import           System.Environment         (lookupEnv)
 import           Text.Mustache
 import           Text.Mustache.Types
 
@@ -33,7 +34,9 @@ xilinxRules XilinxConfig{..} outDir projName srcs ipcores = do
     outDir </> "*.tcl" %> do
         mustache projCtxt
   where
-    xilinx tool args = cmd (Cwd outDir) (xilinxRoot </> tool) args
+    xilinx tool args = liftIO $ do
+      xilinxRootEnv <- lookupEnv "KANSAS_LAVA_XILINX_ROOT" -- optional xtclsh dir
+      cmd (Cwd outDir) ((maybe xilinxRoot id xilinxRootEnv) </> tool) args
 
     projCtxt = object $ [
         "project" ~=  projName,

@@ -1,0 +1,16 @@
+resolver: lts-12.9
+
+packages:
+  - '.'
+
+extra-deps:
+  - kansas-lava-0.2.4.5
+
+  - data-reify-0.6
+  - dotgen-0.4.2
+  - netlist-0.3.1
+  - netlist-to-vhdl-0.3.3
+  - sized-types-0.3.5.2
+  - hastache-0.5.1
+
+extra-package-dbs: []

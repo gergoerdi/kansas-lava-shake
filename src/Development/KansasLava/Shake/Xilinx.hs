@@ -9,13 +9,12 @@ import Development.Shake
 import Development.Shake.FilePath
 import System.Directory
 
-import Data.Monoid
 import Data.List (stripPrefix)
 import Data.Maybe (fromJust)
 import Data.String (fromString)
 
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text as TS
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Text.Hastache
 
 import Paths_kansas_lava_shake
@@ -29,31 +28,31 @@ xilinxRules :: XilinxConfig
             -> [String]
             -> Rules ()
 xilinxRules XilinxConfig{..} mod xaws = do
-    "*.ut" *>
+    "*.ut" %>
         textTemplate []
 
-    "*.xst" *>
+    "*.xst" %>
         textTemplate [ ("MAIN", fromString mod)
                      , ("TOP", fromString mod)
                      , ("PLATFORM", fromString xilinxPlatform)
                      ]
 
-    "*.xise" *>
+    "*.xise" %>
         listTemplate "components" xiseFiles
 
-    "*.prj" *> \target -> do
+    "*.prj" %> \target -> do
         let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
         liftIO $ writeFile target . unlines $
           map (vhdlWork . gensrc) vhdls ++ map (vhdlWork . xawsrc) xaws
 
-    xawsrc "*.vhdl" *> \target -> do
+    xawsrc "*.vhdl" %> \target -> do
         let xaw = ".." </> "xaw" </> takeFileName target -<.> "xaw"
         need [xaw]
         removeFilesAfter "." ["xaw2vhdl.log"]
         xilinx "xaw2vhdl" [xaw, "-st", "XST", target]
-    xawsrc "*.ucf" *> \target -> need [target -<.> "vhdl"]
+    xawsrc "*.ucf" %> \target -> need [target -<.> "vhdl"]
 
-    "*.ngc" *> \target -> do
+    "*.ngc" %> \target -> do
         liftIO $ createDirectoryIfMissing True "xst/projnav.tmp"
         need $
           (target -<.> "prj"):
@@ -73,7 +72,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
                      , "-ofn", target -<.> "syr"
                      ]
 
-    "*.ngd" *> \target -> do
+    "*.ngd" %> \target -> do
         liftIO $ createDirectoryIfMissing True "xst/projnav.tmp"
         let ucf = gensrc $ target -<.> "ucf"
         need [ target -<.> "ngc"
@@ -93,7 +92,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
                           , target
                           ]
 
-    "*.pcf" *> \target -> do
+    "*.pcf" %> \target -> do
         liftIO $ createDirectoryIfMissing True "xst/projnav.tmp"
         need [ target -<.> "ngc"
              , target -<.> "ngd"
@@ -117,9 +116,9 @@ xilinxRules XilinxConfig{..} mod xaws = do
                      ]
 
     alternatives $ do
-        "*_map.ncd" *> \target -> need [mapFileName (fromJust . stripSuffix "_map") target -<.> "pcf"]
+        "*_map.ncd" %> \target -> need [mapFileName (fromJust . stripSuffix "_map") target -<.> "pcf"]
 
-        "*.ncd" *> \target -> do
+        "*.ncd" %> \target -> do
             liftIO $ createDirectoryIfMissing True "xst/projnav.tmp"
             need [target -<.> "pcf"]
             removeFilesAfter "."
@@ -143,7 +142,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
                          , target -<.> "pcf"
                          ]
 
-    "*.bit" *> \target -> do
+    "*.bit" %> \target -> do
         liftIO $ createDirectoryIfMissing True "xst/projnav.tmp"
         need [ target -<.> "ut"
              , target -<.> "ncd"
@@ -186,7 +185,7 @@ hastache ctxt target = do
     alwaysRerun
     templateFile <- liftIO $ getDataFileName ("ise.template" </> templateName)
     t <- liftIO $ hastacheFile hastacheConfig templateFile ctxt
-    writeFileChanged target $ TL.unpack t
+    writeFileChanged target $ BL.unpack t
   where
     hastacheConfig = MuConfig{ muEscapeFunc = emptyEscape
                              , muTemplateFileDir = Nothing
@@ -197,12 +196,12 @@ hastache ctxt target = do
     ext = drop 1 . takeExtension $ target
     templateName = ext <.> "mustache"
 
-listTemplate :: TS.Text -> [MuContext IO] -> FilePath -> Action ()
+listTemplate :: BS.ByteString -> [MuContext IO] -> FilePath -> Action ()
 listTemplate key0 entities = hastache ctxt
   where
     ctxt key = return $ if key == key0 then MuList entities else MuNothing
 
-textTemplate :: [(TS.Text, TL.Text)] -> FilePath -> Action ()
+textTemplate :: [(BS.ByteString, BL.ByteString)] -> FilePath -> Action ()
 textTemplate replacements = hastache ctxt
   where
     ctxt key = return $ case lookup key replacements of

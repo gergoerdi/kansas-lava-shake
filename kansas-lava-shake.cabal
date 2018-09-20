@@ -36,7 +36,7 @@ Library
         hastache
   default-language:    Haskell2010
   other-extensions:    RecordWildCards
-  Ghc-Options:         -Werror -fwarn-unused-imports -fwarn-unused-matches
+  Ghc-Options:         -fwarn-unused-imports -fwarn-unused-matches
                        -fwarn-unused-binds -fwarn-missing-signatures
 
 source-repository head
